@@ -3,9 +3,6 @@
 	)
 	
 ;; TODO: Make obstacles inviolable - perhaps in bounds rather than avoid? 
-;; TODO: Try passing colour with boid and allowing multiple shades?
-;; TODO: Alternative shape? 
-;; TODO: Fix up tests
 ;; TODO: Center pressure - should it be a moving wind or similar?
 
 (def wwidth 646)					; Map width
@@ -23,7 +20,7 @@
             (fn [] {:x (rand-int wwidth) :y (rand-int wheight)})
         )))
 
-(defn create-boid [x y dx dy] {:x x :y y :dx dx :dy dy})
+(defn create-boid [x y dx dy colour] {:x x :y y :dx dx :dy dy :colour colour})
 
 (defn close-boids
     "Get a list of boids which are close"
@@ -44,15 +41,15 @@
 		[0 0]
 		(close-boids x y boids avoid-dist)
 		)]
-		[(/ x 2) (/ y 2)]
+		[(/ x 1) (/ y 1)]
 	))
 
 (defn attract 
 	"Head towards the average position of the rest of the boids (using all here rather than nearest neighbours)"
-	[x y boids]
+	[x y boids influence]
 	(let [
-	    cboids (close-boids x y boids infl-dist)
-	    boid-count (+ (count cboids) 1) ;; allow for 0
+	    cboids (close-boids x y boids influence)
+	    boid-count (if (= (count cboids) 0) 1 (count cboids))
 		[sx sy] (reduce (fn [[ix iy] boid] [(+ ix (:x boid)) (+ iy (:y boid))]) [0 0] cboids)
 		[xav yav] [(/ sx boid-count) (/ sy boid-count)]]
 		[(int (/ (- xav x) 20)) (int (/ (- yav y) 20))]
@@ -61,9 +58,9 @@
 	
 (defn align 
 	"Head the same direction as most of the other boids"
-	[x y boids]
+	[x y boids influence]
 	(let [
-	    cboids (close-boids x y boids infl-dist)
+	    cboids (close-boids x y boids influence)
 	    boid-count (+ (count cboids) 1) ;; allow for 0
 		[sx sy] (reduce (fn [[ix iy] boid] [(+ ix (:dx boid)) (+ iy (:dy boid))]) [0 0] cboids)
 		[xav yav] [(/ sx boid-count) (/ sy boid-count)]]
@@ -104,24 +101,25 @@
 
 (defn behave
 	"The main processing for each boid, apply the three rules and bounds checking"
-	[boid boids]
+	[boid boids influence]
 	(let 
 		[
-			[vx1 vy1] (attract (:x boid) (:y boid) boids)
-			[vx2 vy2] (align (:x boid) (:y boid) boids)
+			[vx1 vy1] (attract (:x boid) (:y boid) boids influence)
+			[vx2 vy2] (align (:x boid) (:y boid) boids  influence)
 			[vx3 vy3] (avoid (:x boid) (:y boid) boids)
-			[vx4 vy4] [(/ (- (/ wwidth 2) (:x boid)) 200) (/ (- (/ wheight 2) (:y boid)) 200)] ;; tend to center
+			[vx4 vy4] [(/ (- (/ wwidth 2) (:x boid)) 300) (/ (- (/ wheight 2) (:y boid)) 300)] ;; tend to center
 			[dx dy] (bound-pos boid (bound-speed [(+ (:dx boid) (/ (+ vx1 vx2 vx3 vx4) 4)) (+ (:dy boid) (/ (+ vy1 vy2 vy3 vy4) 4))]))
 			[newx newy] [(+ (:x boid) dx) (+ (:y boid) dy)]
 		]
-		(create-boid newx newy dx dy)	
+		(create-boid newx newy dx dy (:colour boid))	
 	))
 	
 (defn draw-boid
 	"Draw a boid using quil"
 	[boid]
-		(stroke 50) ;; dark border
-		(fill 100) ;; lighter but still dark fill
+		(let [[r g b] (:colour boid)]
+		    (stroke (color r g b))
+		    (fill (color r g b))) ;; fill
 		(ellipse (:x boid) (:y boid) boid-diam boid-diam)
 	)
 
@@ -133,7 +131,7 @@
 (defn draw []
 	;; Tell the boid agents to update
 	(doseq [agent-boid boids-list]
-	      (send-off agent-boid behave (remove (partial = @agent-boid) (map deref boids-list))))
+	      (send-off agent-boid behave (remove (partial = @agent-boid) (map deref boids-list)) infl-dist))
 
 	;; Blank the background
 	(stroke-weight 0)
@@ -141,8 +139,9 @@
 	(rect 0 0 wwidth wheight)
 	
 	(doseq [col column-list] (do 
-	        (stroke-weight 1)
-	        (fill 0)
+	        (stroke-weight 3)
+	        (stroke 230)
+	        (fill 200)
 	        (ellipse (:x col) (:y col) avoid-dist avoid-dist)
 	    )
 	)
@@ -153,7 +152,13 @@
 (def boids-list
   (take boid-count
         (repeatedly
-         (fn [] (agent (create-boid (rand-int wwidth) (rand-int wheight) (- (rand-int 10) 5) (- (rand-int 10) 5)))))))
+         (fn [] (agent (create-boid 
+            (rand-int wwidth) 
+            (rand-int wheight) 
+            (- (rand-int 10) 5) 
+            (- (rand-int 10) 5) 
+            [(rand-int 255) (rand-int 255) (rand-int 255)]
+        ))))))
 
 (defn -main []
     (defsketch boidsketch                 

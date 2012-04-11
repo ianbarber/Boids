@@ -2,15 +2,13 @@
 	(:use [quil.core])
 	)
 	
-;; TODO: test animation	
-	
 (def wwidth 646)					; Map width
 (def wheight 400)					; Map height
-(def avoid-dist 20)
-(def infl-dist 200)
-(def boid-count 50)
-(def boid-diam 5)
-(def speed 5)
+(def avoid-dist 30)                 ; Stay this far apart
+(def infl-dist 100)                 ; Boids look at other boids in this distance
+(def boid-count 50)                 ; How many boids to have
+(def boid-diam 5)                   ; Size of a boid
+(def max-speed 6)                  ; How fast a boid can go 
 (declare boids-list)
 
 (defn create-boid [x y dx dy] {:x x :y y :dx dx :dy dy})
@@ -32,7 +30,7 @@
 		[0 0]
 		(close-boids x y boid-list avoid-dist)
 		)]
-		[(/ x speed) (/ y speed)]
+		[(/ x 10) (/ y 10)]
 	))
 
 (defn attract 
@@ -43,7 +41,7 @@
 	    boid-count (+ (count cboids) 1) ;; allow for 0
 		[sx sy] (reduce (fn [[ix iy] boid] [(+ ix (:x boid)) (+ iy (:y boid))]) [0 0] cboids)
 		[xav yav] [(/ sx boid-count) (/ sy boid-count)]]
-		[(int (/ (- xav x) 50)) (int (/ (- yav y) 50))]
+		[(int (/ (- xav x) 40)) (int (/ (- yav y) 40))]
 		)
 	)
 	
@@ -55,23 +53,37 @@
 	    boid-count (+ (count cboids) 1) ;; allow for 0
 		[sx sy] (reduce (fn [[ix iy] boid] [(+ ix (:dx boid)) (+ iy (:dy boid))]) [0 0] cboids)
 		[xav yav] [(/ sx boid-count) (/ sy boid-count)]]
-			[(int (/ xav speed)) (int (/ yav speed))]
+			[(int (/ xav 3)) (int (/ yav 3))]
 		)
 	)  
 	
 (defn bound 
 	"Limit the range"
-	[bval bmax]
-	(if (< bval 0) 10 (if (> bval bmax) (- bmax 10) bval))
+	[bval dval bmax]
+	(if (< bval 0) (/ max-speed 2) (if (> bval bmax) (- 0 (/ 2 max-speed)) dval))
 	)
 	
-;; this is broken!
+(defn calc-speed 
+    [[x y]]
+    (Math/sqrt (+ (* x x) (* y y)))
+    )	
+	
+(defn bound-pos
+    "Bound the velocity based on the position"
+    [boid [dx dy]]
+    (let 
+        [   newx (+ (:x boid) dx) 
+            newy (+ (:y boid) dy)]
+        [(bound newx dx wwidth) (bound newy dy wheight)]
+    )    
+)
+
 (defn bound-speed
     "Limit the speed of a boid"
     [[x y]]
-    (let [bspeed (- 20 (+ (Math/abs (int x)) (Math/abs (int y))))]
-        (if (< bspeed 0) 
-            [(- x bspeed) (- y bspeed)]
+    (let [bspeed (calc-speed [x y])]
+        (if (> bspeed max-speed) 
+            [(* max-speed (/ x bspeed)) (* max-speed (/ y bspeed))]
             [x y]
             )
     ))
@@ -84,11 +96,10 @@
 			[vx1 vy1] (attract (:x boid) (:y boid) boids)
 			[vx2 vy2] (align (:x boid) (:y boid) boids)
 			[vx3 vy3] (avoid (:x boid) (:y boid) boids)
-			;; this is also a bit broken!
-			[dx dy] (bound-speed [(+ (:dx boid) (/ (+ vx1 vx2 vx3) 3)) (+ (:dy boid) (/ (+ vy1 vy2 vy3) 3))])
+			[dx dy] (bound-pos boid (bound-speed [(+ (:dx boid) (/ (+ vx1 vx2 vx3) 3)) (+ (:dy boid) (/ (+ vy1 vy2 vy3) 3))]))
 			[newx newy] [(+ (:x boid) dx) (+ (:y boid) dy)]
 		]
-		(create-boid (bound newx wwidth) (bound newy wheight) dx dy)	
+		(create-boid newx newy dx dy)	
 	))
 	
 (defn draw-boid
@@ -101,7 +112,7 @@
 
 (defn setup []
   (smooth)                          ;;Turn on anti-aliasing
-  (frame-rate 25)
+  (frame-rate 24)
   (background 255))
 
 (defn draw []

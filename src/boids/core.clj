@@ -2,12 +2,11 @@
 	(:use [quil.core])
 	)
 	
-;; TODO: Make obstacles inviolable - perhaps in bounds rather than avoid? 
-;; TODO: Center pressure - should it be a moving wind or similar?
-
 (def wwidth 646)					; Map width
 (def wheight 400)					; Map height
 (def avoid-dist 20)                 ; Stay this far apart
+(def col-dist 35)                 	; Stay this far away from the columns
+(def col-size 30)                 	; Column size
 (def infl-dist 100)                 ; Boids look at other boids in this distance
 (def boid-count 50)                 ; How many boids to have
 (def boid-diam 5)                   ; Size of a boid
@@ -24,24 +23,28 @@
 
 (defn close-boids
     "Get a list of boids which are close"
-    [x y boids-list dist]
+    [x y boids dist]
     (filter 
 		(fn [boid] 
 		    (< (+ (Math/abs (int(- x (:x boid)))) (Math/abs (int (- y (:y boid))))) dist) )
-		boids-list
+		boids
 	))
 
 (defn avoid
 	"Avoid getting to close to other boids"
-	[x y boid-list]
+	[x y boid-list column-list]
 	(let [
-	    boids (concat boid-list column-list)
-	    [x y] (reduce 
-		(fn [[sx sy] boid] [(+ sx (- x (:x boid))) (+ sy (- y (:y boid)))])
-		[0 0]
-		(close-boids x y boids avoid-dist)
+	    [x1 y1] (reduce 
+			(fn [[sx sy] boid] [(+ sx (- x (:x boid))) (+ sy (- y (:y boid)))])
+			[0 0]
+			(close-boids x y boid-list avoid-dist)
+		)
+		[x2 y2] (reduce 
+			(fn [[sx sy] column] [(+ sx (- x (:x column))) (+ sy (- y (:y column)))])
+			[0 0]
+			(close-boids x y column-list col-dist)
 		)]
-		[(/ x 1) (/ y 1)]
+		[(+ (/ x1 4) x2) (+ (/ y1 4) y2)]
 	))
 
 (defn attract 
@@ -71,7 +74,7 @@
 (defn bound 
 	"Limit the range"
 	[bval dval bmax]
-	(if (< bval 0) (/ max-speed 2) (if (> bval bmax) (- 0 (/ 2 max-speed)) dval))
+	(if (< bval 0) (/ max-speed 2) (if (> bval bmax) (- 0 (/ max-speed 2)) dval))
 	)
 	
 (defn calc-speed 
@@ -82,11 +85,7 @@
 (defn bound-pos
     "Bound the velocity based on the position"
     [boid [dx dy]]
-    (let 
-        [   newx (+ (:x boid) dx) 
-            newy (+ (:y boid) dy)]
-        [(bound newx dx wwidth) (bound newy dy wheight)]
-    )    
+    [(bound (+ (:x boid) dx) dx wwidth) (bound (+ (:y boid) dy) dy wheight)]
 )
 
 (defn bound-speed
@@ -106,7 +105,7 @@
 		[
 			[vx1 vy1] (attract (:x boid) (:y boid) boids influence)
 			[vx2 vy2] (align (:x boid) (:y boid) boids  influence)
-			[vx3 vy3] (avoid (:x boid) (:y boid) boids)
+			[vx3 vy3] (avoid (:x boid) (:y boid) boids column-list)
 			[vx4 vy4] [(/ (- (/ wwidth 2) (:x boid)) 300) (/ (- (/ wheight 2) (:y boid)) 300)] ;; tend to center
 			[dx dy] (bound-pos boid (bound-speed [(+ (:dx boid) (/ (+ vx1 vx2 vx3 vx4) 4)) (+ (:dy boid) (/ (+ vy1 vy2 vy3 vy4) 4))]))
 			[newx newy] [(+ (:x boid) dx) (+ (:y boid) dy)]
@@ -142,7 +141,7 @@
 	        (stroke-weight 3)
 	        (stroke 230)
 	        (fill 200)
-	        (ellipse (:x col) (:y col) avoid-dist avoid-dist)
+	        (ellipse (:x col) (:y col) col-size col-size)
 	    )
 	)
 	

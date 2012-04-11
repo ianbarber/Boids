@@ -1,13 +1,15 @@
 # boids
 
-FIXME: write description
+Noddy implementations of the boids rules in Clojure and Quil 
 
 ## Usage
 
-FIXME: write
+lein run
+
+Various params can be configured from the top of boids/core
 
 ## License
 
-Copyright (C) 2012 FIXME
+Copyright (C) 2012 Ian Barber
 
 Distributed under the Eclipse Public License, the same as Clojure.

@@ -2,14 +2,26 @@
 	(:use [quil.core])
 	)
 	
+;; TODO: Make obstacles inviolable - perhaps in bounds rather than avoid? 
+;; TODO: Try passing colour with boid and allowing multiple shades?
+;; TODO: Alternative shape? 
+;; TODO: Fix up tests
+;; TODO: Center pressure - should it be a moving wind or similar?
+
 (def wwidth 646)					; Map width
 (def wheight 400)					; Map height
-(def avoid-dist 30)                 ; Stay this far apart
+(def avoid-dist 20)                 ; Stay this far apart
 (def infl-dist 100)                 ; Boids look at other boids in this distance
 (def boid-count 50)                 ; How many boids to have
 (def boid-diam 5)                   ; Size of a boid
 (def max-speed 6)                  ; How fast a boid can go 
 (declare boids-list)
+
+(def column-list
+    (take 5
+        (repeatedly 
+            (fn [] {:x (rand-int wwidth) :y (rand-int wheight)})
+        )))
 
 (defn create-boid [x y dx dy] {:x x :y y :dx dx :dy dy})
 
@@ -25,12 +37,14 @@
 (defn avoid
 	"Avoid getting to close to other boids"
 	[x y boid-list]
-	(let [[x y](reduce 
+	(let [
+	    boids (concat boid-list column-list)
+	    [x y] (reduce 
 		(fn [[sx sy] boid] [(+ sx (- x (:x boid))) (+ sy (- y (:y boid)))])
 		[0 0]
-		(close-boids x y boid-list avoid-dist)
+		(close-boids x y boids avoid-dist)
 		)]
-		[(/ x 10) (/ y 10)]
+		[(/ x 2) (/ y 2)]
 	))
 
 (defn attract 
@@ -41,7 +55,7 @@
 	    boid-count (+ (count cboids) 1) ;; allow for 0
 		[sx sy] (reduce (fn [[ix iy] boid] [(+ ix (:x boid)) (+ iy (:y boid))]) [0 0] cboids)
 		[xav yav] [(/ sx boid-count) (/ sy boid-count)]]
-		[(int (/ (- xav x) 40)) (int (/ (- yav y) 40))]
+		[(int (/ (- xav x) 20)) (int (/ (- yav y) 20))]
 		)
 	)
 	
@@ -96,7 +110,8 @@
 			[vx1 vy1] (attract (:x boid) (:y boid) boids)
 			[vx2 vy2] (align (:x boid) (:y boid) boids)
 			[vx3 vy3] (avoid (:x boid) (:y boid) boids)
-			[dx dy] (bound-pos boid (bound-speed [(+ (:dx boid) (/ (+ vx1 vx2 vx3) 3)) (+ (:dy boid) (/ (+ vy1 vy2 vy3) 3))]))
+			[vx4 vy4] [(/ (- (/ wwidth 2) (:x boid)) 200) (/ (- (/ wheight 2) (:y boid)) 200)] ;; tend to center
+			[dx dy] (bound-pos boid (bound-speed [(+ (:dx boid) (/ (+ vx1 vx2 vx3 vx4) 4)) (+ (:dy boid) (/ (+ vy1 vy2 vy3 vy4) 4))]))
 			[newx newy] [(+ (:x boid) dx) (+ (:y boid) dy)]
 		]
 		(create-boid newx newy dx dy)	
@@ -124,6 +139,13 @@
 	(stroke-weight 0)
 	(fill 255) 
 	(rect 0 0 wwidth wheight)
+	
+	(doseq [col column-list] (do 
+	        (stroke-weight 1)
+	        (fill 0)
+	        (ellipse (:x col) (:y col) avoid-dist avoid-dist)
+	    )
+	)
 	
 	;; Draw the boids
 	(doseq [boid (map deref boids-list)] (draw-boid boid)))

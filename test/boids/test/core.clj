@@ -9,21 +9,21 @@
     (is (= 1 (count (close-boids 60 60 #{(create-boid 80 30 10 10 [])} 100 ))) "Close boids does not include expected boids"))
 
 (deftest test-avoid
-    (let [[x y]  (avoid 60 55 #{(create-boid 65 60 10 10 [])})]
+    (let [[x y]  (avoid 60 55 #{(create-boid 65 60 10 10 [])} [])]
         (is (< x 0) "X val of avoid should be negative for avoidance")
         (is (< y 0) "Y val of avoid should be negative for avoidance")
     )
-    (let [[x y]  (avoid 60 55 #{(create-boid 55 50 10 10 [])})]
+    (let [[x y]  (avoid 60 55 #{(create-boid 55 50 10 10 [])} [])]
         (is (> x 0) "X val of avoid should be positive for avoidance")
         (is (> y 0) "Y val of avoid should be positive for avoidance")
     )
-    (let [[x y]  (avoid 60 55 #{(create-boid 65 50 10 10 [])})]
+    (let [[x y]  (avoid 60 55 #{(create-boid 65 50 10 10 [])} [])]
         (is (< x 0) "X val of avoid should be negative for avoidance")
         (is (> y 0) "Y val of avoid should be positive for avoidance")
     ))
     
 (deftest test-attract
-    (let [[x y]  (attract 60 60 #{(create-boid 80 30 10 10 [])} 100)]
+    (let [[x y]  (attract 60 60 #{(create-boid 90 30 10 10 [])} 200)]
         (is (> x 0) "Boids should be positive X if the center of mass is > x")
         (is (< y 0) "Boids should be negative Y if the center of ass is < y")
     ))

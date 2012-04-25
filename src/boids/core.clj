@@ -1,18 +1,19 @@
 (ns boids.core
 	(:use [quil.core]))
 	
+(def mousepos (atom [0 0]))			; Hold the mouse coordinates
 (def wwidth 646)					; Map width
 (def wheight 400)					; Map height
 (def avoid-dist 20)					; Stay this far apart
-(def col-dist 35)					; Stay this far away from the columns
+(def col-dist 45)					; Stay this far away from the columns
 (def col-size 30) 					; Column size
 (def infl-dist 100)					; Boids look at other boids in this distance
 (def boid-count 50)					; How many boids to have
 (def boid-diam 5)					; Size of a boid
-(def max-speed 6)					; How fast a boid can go 
+(def max-speed 10)					; How fast a boid can go 
 
 (def column-list
-	(take 5
+	(take 3
 		(repeatedly 
 			(fn [] {:x (rand-int wwidth) :y (rand-int wheight)})
 		)))
@@ -32,9 +33,9 @@
 	))
 	
 (def boids-list
-	(take boid-count
+	(atom (take boid-count
 		(repeatedly
-			(fn [] (agent (create-boid 
+			(fn [] (create-boid 
 				(rand-int wwidth) 
 				(rand-int wheight) 
 				(- (rand-int 10) 5) 
@@ -56,7 +57,7 @@
 			[0 0]
 			(close-boids x y column-list col-dist)
 		)]
-		[(+ (/ x1 4) x2) (+ (/ y1 4) y2)]
+		[(+ (/ x1 2) x2) (+ (/ y1 2) y2)]
 	))
 
 (defn attract 
@@ -109,12 +110,19 @@
 	[boid boids influence]
 	(let 
 		[
-			[vx1 vy1] (attract (:x boid) (:y boid) boids influence)
-			[vx2 vy2] (align (:x boid) (:y boid) boids  influence)
+			[vx1 vy1] (bound-speed (attract (:x boid) (:y boid) boids influence))
+			;[vx1 vy1] [0 0]
+			[vx2 vy2] (bound-speed (align (:x boid) (:y boid) boids  influence))
+			;[vx2 vy2] [0 0]
 			[vx3 vy3] (avoid (:x boid) (:y boid) boids column-list)
-			[vx4 vy4] [(/ (- (/ wwidth 2) (:x boid)) 300) (/ (- (/ wheight 2) (:y boid)) 300)] ;; tend to center
-			[dx dy] (bound-pos boid (bound-speed [(+ (:dx boid) (/ (+ vx1 vx2 vx3 vx4) 4)) (+ (:dy boid) (/ (+ vy1 vy2 vy3 vy4) 4))]))
-			[newx newy] [(+ (:x boid) dx) (+ (:y boid) dy)]
+			;;[vx3 vy3] [0 0]
+			[mx my] @mousepos
+			[vx4 vy4] (if (> mx 0) (bound-speed [(/ (- mx (:x boid)) 40) (/ (- my (:y boid)) 40)]) [0 0])
+			[dx1 dy1] [(/ (+ vx1 vx2 vx3 vx4) 4) (/ (+ vy1 vy2 vy3 vy4) 4)]
+			[dx dy] (bound-pos boid (bound-speed [(+ (:dx boid) dx1) (+ (:dy boid) dy1)]))
+			;;[dx dy] (bound-pos boid [(+ (:dx boid) dx1) (+ (:dy boid) dy1)])
+			
+			[newx newy] [(int (+ (:x boid) dx)) (int (+ (:y boid) dy))]
 		]
 		(create-boid newx newy dx dy (:colour boid))	
 	))
@@ -134,9 +142,9 @@
 	(background 255))
 
 (defn draw []
-	;; Tell the boid agents to update
-	(doseq [agent-boid boids-list]
-		(send-off agent-boid behave (remove (partial = @agent-boid) (map deref boids-list)) infl-dist))
+	;; Update the boids position
+	(reset! boids-list (doall (map 
+		#(behave % (remove (partial = %) @boids-list) infl-dist) @boids-list)))
 
 	;; Blank the background
 	(stroke-weight 0)
@@ -150,11 +158,19 @@
 		(ellipse (:x col) (:y col) col-size col-size)))
 	
 	;; Draw the boids
-	(doseq [boid (map deref boids-list)] (draw-boid boid)))
+	(doseq [boid @boids-list] (draw-boid boid)))
+
+(defn mouse-moved [] 
+	(let [x (mouse-x)
+		 y (mouse-y)]
+		(reset! mousepos [x y])
+		)
+	)
 
 (defn -main []
     (defsketch boidsketch                 
       :title "Boids"  					
       :setup setup                      
-      :draw draw                        
-      :size [wwidth wheight]))
+      :draw draw  
+      :size [wwidth wheight]
+	  :mouse-moved mouse-moved))

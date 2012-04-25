@@ -1,6 +1,6 @@
 # boids
 
-Noddy implementations of the boids rules in Clojure and Quil 
+Noddy implementations of the boids rules in Clojure and Quil. Much enhanced at the April London Clojure Dojo
 
 ## Usage
 
